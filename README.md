@@ -1,18 +1,19 @@
 # collatepdf
 
-A simple Python script to **collate multiple PDFs into a single PDF**, with:
+A simple Python script to **collate multiple PDFs into a single PDF** with:
 
-* automatic TOC generation with global page numbering
-* automatic page resizing to ensure all pages in the collated PDF have the same dimensions
-* add an overlay bar on each page with the current file name and global page number
+* an optional cover page,
+* automatic TOC generation with global page numbering,
+* automatic page resizing to ensure all pages in the collated PDF have the same dimensions,
+* an overlay bar on each page with the current file name and global page number.
 
 **Note:** this is a quick-and-dirty, alpha-quality script I wrote for my own needs. Use at your own risks. Please feel free to improve it if you find it useful.
 
 ## Structure of the collated PDF
 
 - Optional cover PDF
-- Table of contents
-- Optional divider pages
+- Auto-generated table of contents
+- Optional divider pages between documents
 - PDF documents
 
 ![](screenshots/collatepdf.png)
