@@ -78,11 +78,7 @@ PARAMS.overlay_y = 11.21 * inch
 PARAMS.overlay_x_text = .65 * inch
 PARAMS.overlay_y_text = 11.29 * inch
 
-
 PARAMS.font = 'Helvetica'
-
-# Here's how to use a specific TTF font.
-# pdfmetrics.registerFont(TTFont(PARAMS.font, 'path/to/font.ttf'))
 
 
 # -------------------------------------------------------------------------------------------------
@@ -148,6 +144,13 @@ def get_pretty_name(file_path, replace_slashes=True):
         pretty_name = pretty_name.replace('/', ' — ')
     pretty_name = '.'.join(pretty_name.split('.')[:-1])
     return pretty_name
+
+
+def set_font(font_path):
+    font_name = op.basename(font_path)
+    print(font_path, font_name)
+    PARAMS.font = font_name
+    pdfmetrics.registerFont(TTFont(PARAMS.font, font_path))
 
 
 # -------------------------------------------------------------------------------------------------
@@ -319,6 +322,8 @@ def main():
         '-o', '--output', required=False, help='Output collated PDF file')
     parser_makepdf.add_argument(
         '-c', '--cover', required=False, help='Cover PDF file')
+    parser_makepdf.add_argument(
+        '-f', '--font', required=False, help='Path to a TTF font')
 
     args = parser.parse_args()
 
@@ -330,6 +335,12 @@ def main():
 
         # Get the paths to the PDFs to collate from the index.
         file_paths = parse_index(args.index)
+
+        # Font
+        if args.font:
+            if not op.exists(args.font):
+                raise ValueError(f"Path `{args.font}` does not exist.")
+            set_font(args.font)
 
         # Create the final writer.
         output_pdf_with_toc = PdfWriter()
