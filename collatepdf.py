@@ -78,7 +78,9 @@ PARAMS.overlay_y = 11.21 * inch
 PARAMS.overlay_x_text = .65 * inch
 PARAMS.overlay_y_text = 11.29 * inch
 
+# Other params
 PARAMS.font = 'Helvetica'
+PARAMS.duplex = True
 
 
 # -------------------------------------------------------------------------------------------------
@@ -148,9 +150,17 @@ def get_pretty_name(file_path, replace_slashes=True):
 
 def set_font(font_path):
     font_name = op.basename(font_path)
-    print(font_path, font_name)
     PARAMS.font = font_name
     pdfmetrics.registerFont(TTFont(PARAMS.font, font_path))
+
+
+def ensure_even_pages(writer):
+    n = 0
+    if PARAMS.duplex and writer.get_num_pages() % 2 == 1:
+        writer.add_blank_page()
+        n = 1
+    assert not PARAMS.duplex or writer.get_num_pages() % 2 == 0
+    return n
 
 
 # -------------------------------------------------------------------------------------------------
@@ -285,6 +295,7 @@ def collate_pdfs(file_paths, output_pdf, first_page=1):
             # Generate the TOC entry.
             toc_entry = f"p. {n:03d} — {toc_entry}"
             toc.append(toc_entry)
+            cur_page += ensure_even_pages(output_pdf)
 
             cur_page += 1
 
@@ -292,12 +303,14 @@ def collate_pdfs(file_paths, output_pdf, first_page=1):
         else:
             pretty_name = get_pretty_name(file_path, replace_slashes=True)
             num_pages = pdf_reader.get_num_pages()
+            # Add all pages of the current PDF.
             for i in range(num_pages):
                 n = cur_page + i + 1
                 page = resize_page(pdf_reader.get_page(i), PARAMS.page_format)
                 add_overlay(page, pretty_name, n=n)
                 output_pdf.add_page(page)
             cur_page += num_pages
+            cur_page += ensure_even_pages(output_pdf)
 
     return toc
 
@@ -324,6 +337,9 @@ def main():
         '-c', '--cover', required=False, help='Cover PDF file')
     parser_makepdf.add_argument(
         '-f', '--font', required=False, help='Path to a TTF font')
+    parser_makepdf.add_argument(
+        '-d', '--duplex', required=False, action='store_true',
+        help='Adapt to double-sided printing')
 
     args = parser.parse_args()
 
@@ -336,11 +352,14 @@ def main():
         # Get the paths to the PDFs to collate from the index.
         file_paths = parse_index(args.index)
 
-        # Font
+        # Font.
         if args.font:
             if not op.exists(args.font):
                 raise ValueError(f"Path `{args.font}` does not exist.")
             set_font(args.font)
+
+        # Duplex printing.
+        PARAMS.duplex = args.duplex
 
         # Create the final writer.
         output_pdf_with_toc = PdfWriter()
@@ -350,6 +369,7 @@ def main():
         cover_file = args.cover or PARAMS.cover_file
         if cover_file:
             first_page += append_pdf(output_pdf_with_toc, cover_file)
+            ensure_even_pages(output_pdf_with_toc)
 
         # Create the writer.
         output_pdf = PdfWriter()
@@ -364,6 +384,7 @@ def main():
 
         # Add the TOC.
         append_pdf(output_pdf_with_toc, toc_pdf)
+        ensure_even_pages(output_pdf_with_toc)
 
         # Add the collated PDFs.
         append_pdf(output_pdf_with_toc, output_pdf)
