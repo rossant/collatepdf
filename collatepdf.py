@@ -70,6 +70,7 @@ PARAMS.divider_font_size = 24
 PARAMS.overlay_font_size = 12
 PARAMS.overlay_bgcolor = (.3, .6, .9)
 PARAMS.overlay_edgecolor = white
+PARAMS.overlay_textcolor = (0, 0, 0)
 PARAMS.overlay_opacity = 0.9
 PARAMS.overlay_w = 500
 PARAMS.overlay_h = 20
@@ -195,6 +196,10 @@ def parse_index(index_file):
                 continue
             if not line.startswith('#'):
                 file_paths.append(line)
+            else:  # comment
+                if 'PARAMS.' in line:
+                    # modify parameters defined as comment in the index file
+                    exec(line[1:].strip(), {'PARAMS': PARAMS}, {})
     return file_paths
 
 
@@ -246,7 +251,7 @@ def create_overlay(text):
     can.rect(
         PARAMS.overlay_x, PARAMS.overlay_y,
         PARAMS.overlay_w, PARAMS.overlay_h, fill=1)
-    can.setFillColorRGB(0, 0, 0)
+    can.setFillColor(PARAMS.overlay_textcolor)
 
     print(text)
     can.drawString(PARAMS.overlay_x_text, PARAMS.overlay_y_text, text)
