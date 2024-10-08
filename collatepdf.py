@@ -33,7 +33,7 @@ import sys
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import white
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import inch
+from reportlab.lib.units import cm, inch
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from pypdf import PdfReader, PdfWriter, PageObject
@@ -54,7 +54,7 @@ class Bunch:
 PARAMS = Bunch()
 
 # PARAMS.root_dir = '.'
-PARAMS.page_format = A4
+PARAMS.page_format = A4  # (8*inch, 10*inch)
 PARAMS.index_file = 'samples/index.txt'
 PARAMS.output_file = 'samples/collated.pdf'
 PARAMS.cover_file = ''  # 'samples/cover.pdf'
@@ -115,10 +115,14 @@ def iter_files(file_paths):
     for file_path in file_paths:
         if file_path.startswith('@'):
             yield file_path, None
+        elif not file_path:
+            yield None, None
+        # elif file_path == "LEFT":
+        #     yield "LEFT", None
         else:
             # abs_path = op.join(PARAMS.root_dir, file_path)
             if not op.exists(file_path):
-                print(f"! {file_path} does not exist")
+                print(f"********** {file_path} does not exist")
                 continue
             print(file_path)
             pdf_reader = PdfReader(file_path)
@@ -138,7 +142,9 @@ def resize_page(page, page_format):
 
 
 def count_pages(file_paths):
-    return sum(pdf_reader.get_num_pages() for _, pdf_reader in iter_files(file_paths))
+    return sum(
+        pdf_reader.get_num_pages()
+        for _, pdf_reader in iter_files(file_paths) if pdf_reader)
 
 
 def get_pretty_name(file_path, replace_slashes=True):
@@ -194,6 +200,10 @@ def parse_index(index_file):
                 break
             if not line:
                 continue
+            if line == "# BLANK":
+                file_paths.append('')
+            # if line == "# LEFT":
+            #     file_paths.append('LEFT')
             if not line.startswith('#'):
                 file_paths.append(line)
             else:  # comment
@@ -210,7 +220,7 @@ def parse_index(index_file):
 def create_toc(canvas, toc):
     canvas.setFont(PARAMS.font, PARAMS.toc_font_size)
     canvas.drawString(1 * inch, 10.5 * inch, PARAMS.toc_title)
-    y = 10.0 * inch
+    y = 10.25 * inch
     for entry in toc:
         canvas.drawString(1 * inch, y, entry)
         y -= 0.25 * inch
@@ -253,7 +263,7 @@ def create_overlay(text):
         PARAMS.overlay_w, PARAMS.overlay_h, fill=1)
     can.setFillColor(PARAMS.overlay_textcolor)
 
-    print(text)
+    # print(text)
     can.drawString(PARAMS.overlay_x_text, PARAMS.overlay_y_text, text)
     can.save()
     packet.seek(0)
@@ -277,14 +287,29 @@ def add_overlay(page, name, n=0):
 def collate_pdfs(file_paths, output_pdf, first_page=1):
     toc = []
     cur_page = first_page
+    # left = None
 
     for file_path, pdf_reader in iter_files(file_paths):
+        n = cur_page + 1
+
+        # # HACK: force the next item to start on the left page.
+        # if not left:
+        #     left = file_path == "LEFT"
+        #     if left:
+        #         continue
+
+        # Blank page
+        if not file_path:
+            output_pdf.add_blank_page()
+            cur_page += 1
+            n += 1
 
         # Divider page.
-        if not pdf_reader:
-            # Divider title.
-            n = cur_page + 1
+        elif not pdf_reader:
             toc_entry = file_path[1:].strip()
+
+            cur_page += ensure_even_pages(output_pdf)
+            n = cur_page + 1
 
             # Create the divider page.
             with make_canvas() as canvas:
@@ -298,9 +323,14 @@ def collate_pdfs(file_paths, output_pdf, first_page=1):
             output_pdf.add_page(page)
 
             # Generate the TOC entry.
-            toc_entry = f"p. {n:03d} — {toc_entry}"
-            toc.append(toc_entry)
-            cur_page += ensure_even_pages(output_pdf)
+            toc.append("")
+            toc.append(f"p. {n:d} — {toc_entry}")
+
+            # HACK: if "LEFT" is set, force the item to start on the left page.
+            # if not left:
+            # cur_page += ensure_even_pages(output_pdf)
+            # else:
+            #     left = None
 
             cur_page += 1
 
@@ -308,6 +338,10 @@ def collate_pdfs(file_paths, output_pdf, first_page=1):
         else:
             pretty_name = get_pretty_name(file_path, replace_slashes=True)
             num_pages = pdf_reader.get_num_pages()
+
+            # Add TOC entry
+            toc.append(f"p. {n:d} — {pretty_name}")
+
             # Add all pages of the current PDF.
             for i in range(num_pages):
                 n = cur_page + i + 1
@@ -315,7 +349,12 @@ def collate_pdfs(file_paths, output_pdf, first_page=1):
                 add_overlay(page, pretty_name, n=n)
                 output_pdf.add_page(page)
             cur_page += num_pages
-            cur_page += ensure_even_pages(output_pdf)
+
+            # # HACK: if "LEFT" is set, force the item to start on the left page.
+            # if not left:
+            #     cur_page += ensure_even_pages(output_pdf)
+            # else:
+            #     left = None
 
     return toc
 
